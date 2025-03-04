@@ -7,8 +7,8 @@ Original file is located at
     https://colab.research.google.com/drive/1s_pDTchMPesQrcMscT7RTwB1rXqbfNFh
 """
 
-!pip install faiss-cpu
-!pip install mistralai
+pip install faiss-cpu
+pip install mistralai
 
 import os
 os.environ["MISTRAL_API_KEY"] = "NXyKdE5JFehmTjXn1RtYyVBOlMzPLGyB"
@@ -80,9 +80,9 @@ for policy in soup.select(".some-class-for-policy-titles"):  # Replace with actu
 for policy in policies:
     print(policy)
 
-!pip install streamlit
+pip install streamlit
 
-!pip install datasets
+pip install datasets
 
 import streamlit as st
 from transformers import RagTokenizer, RagRetriever, RagSequenceForGeneration

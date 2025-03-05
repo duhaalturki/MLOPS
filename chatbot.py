@@ -72,8 +72,7 @@ def mistral_answer(query, context):
 def streamlit_app():
     st.title('UDST Policies Q&A')
 
-    # Select a policy from a list of 10 policies (example URLs)
-# Select a policy from a list of 10 policies (updated URLs)
+
     policies = [
     "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/academic-annual-leave-policy",
     "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/academic-appraisal-policy",
@@ -98,7 +97,7 @@ def streamlit_app():
     faiss_index = create_faiss_index(embeddings)
     
     # Input box for query
-    query = st.text_input("Enter your Query:")
+    query = st.text_input("Enter Your Query:")
     
     if query:
         # Embed the user query and search for relevant chunks

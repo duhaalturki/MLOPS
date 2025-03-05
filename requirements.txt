@@ -1,4 +1,8 @@
 streamlit
-pandas
-numpy
-scikit-learn
+faiss-cpu
+mistralai
+beautifulsoup4
+requests
+sentence-transformers
+torch
+transformers

@@ -1,8 +1,10 @@
 import streamlit as st
-import requests
-from transformers import pipeline, MistralForCausalLM, MistralTokenizer
+from transformers import pipeline
 
-# Define the policy dictionary
+# Load QA pipeline with a simple model
+qa_pipeline = pipeline("question-answering", model="distilbert-base-uncased")
+
+# Define the policy dictionary (simplified version)
 policies = {
     "Academic Annual Leave": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/academic-annual-leave-policy",
     "Academic Appraisal": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/academic-appraisal-policy",
@@ -26,7 +28,8 @@ policies = {
     "Use of Library Space": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/use-library-space-policy"
 }
 
-# Function to classify intent and map to a policy
+
+# Function to classify intent (simplified version)
 def classify_intent(query):
     query = query.lower()
     for policy_name in policies.keys():
@@ -34,49 +37,30 @@ def classify_intent(query):
             return policy_name, policies[policy_name]
     return None, None  # If no matching policy is found
 
-# Function to generate answers using Mistral model
-def generate_answer_with_mistral(query, policy_url):
-    # Load Mistral model and tokenizer
-    model = MistralForCausalLM.from_pretrained("mistral-7b")
-    tokenizer = MistralTokenizer.from_pretrained("mistral-7b")
-
-    # Prepare input for the model
-    context = f"Context: Please provide an answer based on the policy found at: {policy_url}\nQuestion: {query}\nAnswer:"
-    inputs = tokenizer(context, return_tensors="pt")
-    
-    # Generate response
-    output = model.generate(inputs['input_ids'], max_length=500)
-
-    # Decode the output to text
-    return tokenizer.decode(output[0], skip_special_tokens=True)
+# Function to generate answers using QA pipeline
+def generate_answer(query, policy_url):
+    context = f"Read more about the policy here: {policy_url}. Now answer the following question: {query}"
+    result = qa_pipeline(question=query, context=context)
+    return result['answer']
 
 # Streamlit UI
 def streamlit_app():
     st.title("UDST Policy Chatbot")
 
-    # Instructions
-    st.write("""
-        Ask a question related to any UDST policy and get the relevant information.
-        Please type your query in the text box below.
-    """)
-
-    # Query input box
     query = st.text_input("Enter your query:")
-
-    # Submit button
+    
     if st.button("Submit"):
         if query:
-            # Classify the intent to identify which policy is related
+            # Classify intent and match with policy
             policy_name, policy_url = classify_intent(query)
-            
             if policy_name:
-                # If the policy is identified, fetch the relevant policy URL and generate an answer
-                answer = generate_answer_with_mistral(query, policy_url)
+                # Generate answer using the QA pipeline
+                answer = generate_answer(query, policy_url)
                 st.text_area("Answer", answer, height=200)
             else:
-                st.warning("Sorry, I couldn't identify a policy related to your question.")
+                st.warning("Sorry, no related policy found for your query.")
         else:
-            st.warning("Please enter a query to get an answer.")
+            st.warning("Please enter a query.")
 
 # Run the Streamlit app
 if __name__ == "__main__":

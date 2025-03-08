@@ -94,31 +94,32 @@ policies = {
     "Digital Media Centre Booking": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/digital-media-centre-booking",
     "Use of Library Space": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/use-library-space-policy"
 }
-    selected_policy_url = st.selectbox('Select a Policy', policies)
+
+selected_policy_url = st.selectbox('Select a Policy', policies)
     
     # Fetch policy data and chunk it
-    policy_text = fetch_policy_data(selected_policy_url)
-    chunks = chunk_text(policy_text)
+policy_text = fetch_policy_data(selected_policy_url)
+chunks = chunk_text(policy_text)
     
     # Generate embeddings for the chunks and create a FAISS index
-    embeddings = get_text_embedding(chunks)
-    faiss_index = create_faiss_index(embeddings)
+embeddings = get_text_embedding(chunks)
+faiss_index = create_faiss_index(embeddings)
     
     # Input box for query
-    query = st.text_input("Enter your Query:")
+query = st.text_input("Enter your Query:")
     
-    if query:
+if query:
         # Embed the user query and search for relevant chunks
-        query_embedding = np.array([get_text_embedding([query])[0].embedding])
-        I = search_relevant_chunks(faiss_index, query_embedding, k=2)
-        retrieved_chunks = [chunks[i] for i in I.tolist()[0]]
-        context = " ".join(retrieved_chunks)
+    query_embedding = np.array([get_text_embedding([query])[0].embedding])
+    I = search_relevant_chunks(faiss_index, query_embedding, k=2)
+    retrieved_chunks = [chunks[i] for i in I.tolist()[0]]
+    context = " ".join(retrieved_chunks)
         
         # Generate answer from the model
-        answer = mistral_answer(query, context)
+    answer = mistral_answer(query, context)
         
         # Display the answer
-        st.text_area("Answer:", answer, height=200)
+    st.text_area("Answer:", answer, height=200)
 
 
 if __name__ == "__main__":

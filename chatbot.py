@@ -95,6 +95,7 @@ policies = {
     "Use of Library Space": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/use-library-space-policy"
 }
 
+
 selected_policy_url = st.selectbox('Select a Policy', policies)
     
     # Fetch policy data and chunk it

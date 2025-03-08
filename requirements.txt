@@ -8,3 +8,4 @@ mistralai
 transformers
 scikit-learn
 torch
+dotenv

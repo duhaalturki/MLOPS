@@ -1,10 +1,11 @@
 import streamlit as st
-from transformers import pipeline
+import mistralai
+from mistralai import Client
 
-# Load QA pipeline with a simple model
-qa_pipeline = pipeline("question-answering", model="distilbert-base-uncased")
+# Initialize the Mistral client (you need an API key to use this)
+client = Client(api_key="NXyKdE5JFehmTjXn1RtYyVBOlMzPLGyB")  # Replace with your Mistral API key
 
-# Define the policy dictionary (simplified version)
+# Define the policy dictionary
 policies = {
     "Academic Annual Leave": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/academic-annual-leave-policy",
     "Academic Appraisal": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/academic-appraisal-policy",
@@ -28,33 +29,50 @@ policies = {
     "Use of Library Space": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/use-library-space-policy"
 }
 
-
-# Function to classify intent (simplified version)
+# Function to classify intent and match the policy using Mistral
 def classify_intent(query):
-    query = query.lower()
+    # Use Mistral to classify the intent by querying the model with the policy names
+    response = client.chat.complete(
+        model="mistral-large-latest",  # Specify the Mistral model
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant that classifies queries related to policies."},
+            {"role": "user", "content": f"Classify the policy related to the query: '{query}'"}
+        ]
+    )
+    intent = response['choices'][0]['message']['content'].strip()
+    
+    # Return the matching policy and its URL
     for policy_name in policies.keys():
-        if policy_name.lower() in query:
+        if policy_name.lower() in intent.lower():
             return policy_name, policies[policy_name]
     return None, None  # If no matching policy is found
 
-# Function to generate answers using QA pipeline
+# Function to generate answers using the Mistral QA model
 def generate_answer(query, policy_url):
+    # Create context based on the policy URL
     context = f"Read more about the policy here: {policy_url}. Now answer the following question: {query}"
-    result = qa_pipeline(question=query, context=context)
-    return result['answer']
+    response = client.chat.complete(
+        model="mistral-large-latest",  # Specify the Mistral model
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant that answers questions based on policies."},
+            {"role": "user", "content": f"Answer the question: '{query}' using the following context: {context}"}
+        ]
+    )
+    return response['choices'][0]['message']['content'].strip()
 
 # Streamlit UI
 def streamlit_app():
     st.title("UDST Policy Chatbot")
 
+    # Get query input from the user
     query = st.text_input("Enter your query:")
-    
+
     if st.button("Submit"):
         if query:
-            # Classify intent and match with policy
+            # Classify the intent and match the query with a policy
             policy_name, policy_url = classify_intent(query)
             if policy_name:
-                # Generate answer using the QA pipeline
+                # Generate answer using Mistral
                 answer = generate_answer(query, policy_url)
                 st.text_area("Answer", answer, height=200)
             else:

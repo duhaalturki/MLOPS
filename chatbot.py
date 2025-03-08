@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 import numpy as np
 import faiss
 from mistralai import Mistral
+from mistralai import models 
 from transformers import pipeline
 from sklearn.preprocessing import normalize
 
@@ -58,15 +59,9 @@ def chunk_text(text, chunk_size=512):
     #return [emb.embedding for emb in embeddings_batch_response.data]
 def get_text_embedding(text_chunks):
     try:
-        # Print the chunks to verify the format
-        print("Text Chunks:", text_chunks)
-        
-        # Call the API to generate embeddings
         embeddings_batch_response = client.embeddings.create(model="mistral-embed", inputs=text_chunks)
-        
-        # Return the embeddings
         return [emb.embedding for emb in embeddings_batch_response.data]
-    except models.SDKError as e:
+    except models.SDKError as e:  # Reference SDKError correctly here
         print(f"SDKError: {str(e)}")  # This will log the error message
         return []  # Return an empty list in case of an error
 

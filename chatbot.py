@@ -53,9 +53,23 @@ def chunk_text(text, chunk_size=512):
     return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
 
 # get embeddings
+#def get_text_embedding(text_chunks):
+    #embeddings_batch_response = client.embeddings.create(model="mistral-embed", inputs=text_chunks)
+    #return [emb.embedding for emb in embeddings_batch_response.data]
 def get_text_embedding(text_chunks):
-    embeddings_batch_response = client.embeddings.create(model="mistral-embed", inputs=text_chunks)
-    return [emb.embedding for emb in embeddings_batch_response.data]
+    try:
+        # Print the chunks to verify the format
+        print("Text Chunks:", text_chunks)
+        
+        # Call the API to generate embeddings
+        embeddings_batch_response = client.embeddings.create(model="mistral-embed", inputs=text_chunks)
+        
+        # Return the embeddings
+        return [emb.embedding for emb in embeddings_batch_response.data]
+    except models.SDKError as e:
+        print(f"SDKError: {str(e)}")  # This will log the error message
+        return []  # Return an empty list in case of an error
+
 
 # create FAISS index
 def create_faiss_index(embeddings):

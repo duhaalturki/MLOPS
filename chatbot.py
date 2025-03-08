@@ -53,18 +53,25 @@ def chunk_text(text, chunk_size=512):
     return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
 
 # Get embeddings
-def get_text_embedding(text_chunks):
-    try:
-        embeddings_batch_response = client.embeddings.create(model="mistral-embed", inputs=text_chunks)
-        embeddings = [emb.embedding for emb in embeddings_batch_response.data]
-        
-        # Debugging: Print embeddings here to check if they are generated
-        print(f"Generated Embeddings: {embeddings}")  # Debugging line
-        
-        return embeddings
-    except Exception as e:
-        print(f"Error during embedding generation: {str(e)}")
-        return []
+def get_text_embedding(text_list, batch_size=20):
+    """
+    Uses Mistral to get embeddings for each text in text_list.
+    Returns a list of embedding vectors.
+    """
+    client = Mistral(api_key=api_key)
+    all_embeddings = []
+    for i in range(0, len(text_list), batch_size):
+        batch = text_list[i : i + batch_size]
+        try:
+            response = client.embeddings.create(model="mistral-embed", inputs=batch)
+            all_embeddings.extend(r.embedding for r in response.data)
+            time.sleep(2)  # small sleep to reduce rate-limit risk
+        except Exception as e:
+            st.error(f"Error retrieving embeddings: {e}")
+            for _ in batch:
+                all_embeddings.append(None)
+    return all_embeddings
+
 
 # Create FAISS index
 def create_faiss_index(embeddings):

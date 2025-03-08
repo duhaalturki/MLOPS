@@ -1,10 +1,16 @@
 import streamlit as st
+import os
 import requests
-from urllib.parse import urlparse
+from bs4 import BeautifulSoup
+import numpy as np
 from mistralai import Mistral
+from urllib.parse import urlparse
+import faiss
 
-# Mistral Client setup
-client = Client(api_key="NXyKdE5JFehmTjXn1RtYyVBOlMzPLGyB")
+
+# Mistral api setup
+api_key="NXyKdE5JFehmTjXn1RtYyVBOlMzPLGyB"
+os.environ["MISTRAL_API_KEY"] = api_key
 
 # Dictionary of policies with links
 policies = {

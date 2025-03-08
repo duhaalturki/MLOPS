@@ -5,36 +5,35 @@ from bs4 import BeautifulSoup
 import numpy as np
 import faiss
 from mistralai import Mistral
-from mistralai import models 
 from transformers import pipeline
 from sklearn.preprocessing import normalize
 
-# mistral API key
+# Mistral API key
 api_key = "NXyKdE5JFehmTjXn1RtYyVBOlMzPLGyB"
 os.environ["MISTRAL_API_KEY"] = api_key
 
 client = Mistral(api_key=api_key)
 
-# intent classification model (Zero-shot using Hugging Face)
+# Intent classification model (Zero-shot using Hugging Face)
 classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
 
-# policies
+# Policies
 policies = {
-    "Academic Annual Leave": "https://www.udst.edu.qa/.../academic-annual-leave-policy",
-    "Academic Appraisal": "https://www.udst.edu.qa/.../academic-appraisal-policy",
-    "Intellectual Property": "https://www.udst.edu.qa/.../intellectual-property-policy",
-    "Credit Hour": "https://www.udst.edu.qa/.../credit-hour-policy",
-    "Research Ethics": "https://www.udst.edu.qa/.../research-ethics-policy",
-    "Student Conduct": "https://www.udst.edu.qa/.../student-conduct-policy",
-    "Faculty Hiring": "https://www.udst.edu.qa/.../faculty-hiring-policy",
-    "Examination Rules": "https://www.udst.edu.qa/.../examination-rules-policy",
-    "Library Usage": "https://www.udst.edu.qa/.../library-usage-policy",
-    "Attendance Policy": "https://www.udst.edu.qa/.../attendance-policy",
-    "Disciplinary Actions": "https://www.udst.edu.qa/.../disciplinary-actions-policy",
-    "Data Privacy": "https://www.udst.edu.qa/.../data-privacy-policy",
-    "Grading System": "https://www.udst.edu.qa/.../grading-system-policy",
-    "Student Appeals": "https://www.udst.edu.qa/.../student-appeals-policy",
-    "Harassment Policy": "https://www.udst.edu.qa/.../harassment-policy",
+    "Academic Annual Leave": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/academic-annual-leave-policy",
+    "Academic Appraisal": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/academic-appraisal-policy",
+    "Intellectual Property": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/intellectual-property-policy",
+    "Credit Hour": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/credit-hour-policy",
+    "Program Accreditation": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/program-accreditation-policy",
+    "Student Conduct": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/student-conduct-policy",
+    "Graduate Final Grade": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/graduate-final-grade-policy",
+    "Examination Rules": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/examination-policy",
+    "International Student": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/udst-policies-and-procedures/international-student-policy",
+    "Student Attendance": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/student-attendance-policy",
+    "Graduate Academic Standing": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/udst-policies-and-procedures/graduate-academic-standing-policy",
+    "Student Engagement": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/udst-policies-and-procedures/student-engagement-policy",
+    "Graduate Admissions": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/graduate-admissions-policy",
+    "Student Appeals": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/student-appeals-policy",
+    "Registration Policy": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/registration-policy",
     "Scholarship and Financial Assistance": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/scholarship-and-financial-assistance",
     "Right to Refuse Service": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/right-refuse-service-procedure",
     "Library Study Room Booking": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/library-study-room-booking-procedure",
@@ -42,79 +41,50 @@ policies = {
     "Use of Library Space": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/use-library-space-policy"
 }
 
-# fetch policy data
+# Fetch policy data
 def fetch_policy_data(url):
     response = requests.get(url)
     soup = BeautifulSoup(response.text, "html.parser")
     tag = soup.find("div")
     return tag.text.strip() if tag else ""
 
-# chunking function
+# Chunking function
 def chunk_text(text, chunk_size=512):
     return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
 
-# get embeddings
-#def get_text_embedding(text_chunks):
-    #embeddings_batch_response = client.embeddings.create(model="mistral-embed", inputs=text_chunks)
-    #return [emb.embedding for emb in embeddings_batch_response.data]
+# Get embeddings
 def get_text_embedding(text_chunks):
     try:
         embeddings_batch_response = client.embeddings.create(model="mistral-embed", inputs=text_chunks)
-        return [emb.embedding for emb in embeddings_batch_response.data]
-    except models.SDKError as e:  # Reference SDKError correctly here
-        print(f"SDKError: {str(e)}")  # This will log the error message
-        return []  # Return an empty list in case of an error
+        embeddings = [emb.embedding for emb in embeddings_batch_response.data]
+        
+        # Debugging: Print embeddings here to check if they are generated
+        print(f"Generated Embeddings: {embeddings}")  # Debugging line
+        
+        return embeddings
+    except Exception as e:
+        print(f"Error during embedding generation: {str(e)}")
+        return []
 
-
-# create FAISS index
-#def create_faiss_index(embeddings):
-    #embedding_vectors = np.array(embeddings, dtype=np.float32)
-    #embedding_vectors = normalize(embedding_vectors, axis=1)  # Normalize for better retrieval
-    #d = embedding_vectors.shape[1]
-    #index = faiss.IndexHNSWFlat(d, 32)  # HNSW for efficient search
-    #index.add(embedding_vectors)
-    #return index
+# Create FAISS index
 def create_faiss_index(embeddings):
-    # Check if embeddings are empty
     if not embeddings:
         raise ValueError("Embeddings are empty! Please check the embedding generation process.")
     
-    # Convert embeddings to a NumPy array
     embedding_vectors = np.array(embeddings, dtype=np.float32)
-    
-    # Check the shape of embedding_vectors
-    print(f"Shape of embedding_vectors: {embedding_vectors.shape}")  # Debugging line
-    
-    # Ensure the embeddings are 2D (each row is a vector)
-    if embedding_vectors.ndim == 1:
-        embedding_vectors = embedding_vectors.reshape(1, -1)  # Reshape to 2D if needed
-    
-    # Check again if the reshaped array is 2D
-    if embedding_vectors.ndim != 2:
-        raise ValueError(f"Expected 2D array for embeddings, but got {embedding_vectors.ndim}D array.")
-    
-    # Normalize the vectors (required for better retrieval in FAISS)
-    try:
-        embedding_vectors = normalize(embedding_vectors, axis=1)
-    except ValueError as e:
-        print(f"Error during normalization: {str(e)}")
-        raise
-    
-    # Create a FAISS index
-    d = embedding_vectors.shape[1]  # Number of dimensions
+    embedding_vectors = normalize(embedding_vectors, axis=1)  # Normalize for better retrieval
+    d = embedding_vectors.shape[1]
     index = faiss.IndexHNSWFlat(d, 32)  # HNSW for efficient search
     index.add(embedding_vectors)
     return index
 
-
-
-# search FAISS index
+# Search FAISS index
 def search_relevant_chunks(index, query_embedding, k=3):
     query_embedding = normalize(np.array([query_embedding], dtype=np.float32))
     D, I = index.search(query_embedding, k)
     return I[0]
 
-# generate answer using Mistral
+# Generate answer using Mistral
 def mistral_answer(query, context):
     prompt = f"""
     You are an AI assistant trained to answer questions based on UDST policies.
@@ -130,32 +100,40 @@ def mistral_answer(query, context):
     response = client.chat.complete(model="mistral-large-latest", messages=messages)
     return response.choices[0].message.content
 
-# streamlit UI
+# Streamlit UI
 def streamlit_app():
     st.title('UDST Policy Chatbot')
     
-    #user input query
+    # User input query
     query = st.text_input("Enter your query:")
     
     if query:
-        # intent classification
+        # Intent classification
         labels = list(policies.keys())
         classification = classifier(query, labels)
         predicted_policy = classification['labels'][0]
         st.write(f"Predicted Policy: {predicted_policy}")
         
-        # fetch and process policy data
+        # Fetch and process policy data
         policy_text = fetch_policy_data(policies[predicted_policy])
         chunks = chunk_text(policy_text)
         embeddings = get_text_embedding(chunks)
+        
+        # Debugging: Print embeddings to check if they are empty or malformed
+        print(f"Embeddings: {embeddings}")  # Debugging line
+        
+        if not embeddings:
+            st.write("Error: No embeddings generated. Please check the embedding generation process.")
+            return
+        
         faiss_index = create_faiss_index(embeddings)
         
-        # retrieve most relevant chunks
+        # Retrieve most relevant chunks
         query_embedding = get_text_embedding([query])[0]
         retrieved_chunks = [chunks[i] for i in search_relevant_chunks(faiss_index, query_embedding)]
         context = " ".join(retrieved_chunks)
         
-        # generate answer
+        # Generate answer
         answer = mistral_answer(query, context)
         st.text_area("Answer:", answer, height=200)
 

@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import requests
+import time
 from bs4 import BeautifulSoup
 import numpy as np
 import faiss

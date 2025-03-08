@@ -1,24 +1,9 @@
 import streamlit as st
-import os
-import requests
-import time
-from bs4 import BeautifulSoup
-import numpy as np
-import faiss
-from mistralai import Mistral
-from transformers import pipeline
-from sklearn.preprocessing import normalize
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+from transformers import MistralForConditionalGeneration, MistralTokenizer
 
-# Mistral API key
-api_key = "NXyKdE5JFehmTjXn1RtYyVBOlMzPLGyB"
-os.environ["MISTRAL_API_KEY"] = api_key
-
-client = Mistral(api_key=api_key)
-
-# Intent classification model (Zero-shot using Hugging Face)
-classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
-
-# Full list of policies
+# Define the UDST policies
 policies = {
     "Academic Annual Leave": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/academic-annual-leave-policy",
     "Academic Appraisal": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/academic-appraisal-policy",
@@ -42,112 +27,58 @@ policies = {
     "Use of Library Space": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/use-library-space-policy"
 }
 
-# Fetch policy data
-def fetch_policy_data(url):
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, "html.parser")
-    tag = soup.find("div")
-    return tag.text.strip() if tag else ""
+# Load the Mistral model and tokenizer
+tokenizer = MistralTokenizer.from_pretrained("facebook/mistral-7b-v0.1")
+model = MistralForConditionalGeneration.from_pretrained("facebook/mistral-7b-v0.1")
 
-# Chunking function
-def chunk_text(text, chunk_size=512):
-    return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+# Vectorizer for intent classification
+vectorizer = TfidfVectorizer()
+policy_names = list(policies.keys())
+X = vectorizer.fit_transform(policy_names)
 
-# Get embeddings
-def get_text_embedding(text_list, batch_size=20):
-    """
-    Uses Mistral to get embeddings for each text in text_list.
-    Returns a list of embedding vectors.
-    """
-    client = Mistral(api_key=api_key)
-    all_embeddings = []
-    for i in range(0, len(text_list), batch_size):
-        batch = text_list[i : i + batch_size]
-        try:
-            response = client.embeddings.create(model="mistral-embed", inputs=batch)
-            all_embeddings.extend(r.embedding for r in response.data)
-            time.sleep(2)  # small sleep to reduce rate-limit risk
-        except Exception as e:
-            st.error(f"Error retrieving embeddings: {e}")
-            for _ in batch:
-                all_embeddings.append(None)
-    return all_embeddings
+# Function to classify the intent (which policy the query relates to)
+def classify_intent(query):
+    query_vector = vectorizer.transform([query])
+    similarity_scores = cosine_similarity(query_vector, X)
+    best_match_index = similarity_scores.argmax()
+    return policy_names[best_match_index]
 
-
-# Create FAISS index
-def create_faiss_index(embeddings):
-    if not embeddings:
-        raise ValueError("Embeddings are empty! Please check the embedding generation process.")
+# Function to generate answers using Mistral (RAG-based QA)
+def get_policy_answer(query, policy_name):
+    # Preparing the context based on the policy
+    context = f"The policy for {policy_name} is available at {policies[policy_name]}."
     
-    embedding_vectors = np.array(embeddings, dtype=np.float32)
-    embedding_vectors = normalize(embedding_vectors, axis=1)  # Normalize for better retrieval
-    d = embedding_vectors.shape[1]
-    index = faiss.IndexHNSWFlat(d, 32)  # HNSW for efficient search
-    index.add(embedding_vectors)
-    return index
-
-# Search FAISS index
-def search_relevant_chunks(index, query_embedding, k=3):
-    query_embedding = normalize(np.array([query_embedding], dtype=np.float32))
-    D, I = index.search(query_embedding, k)
-    return I[0]
-
-# Generate answer using Mistral
-def mistral_answer(query, context):
-    prompt = f"""
-    You are an AI assistant trained to answer questions based on UDST policies.
-    Below is the relevant policy information:
-    ---------------------
-    {context}
-    ---------------------
-    Please provide a concise, factual, and accurate response using only the information given.
-    Query: {query}
-    Answer:
-    """
-    messages = [{"role": "user", "content": prompt}]
-    try:
-        response = client.chat.complete(model="mistral-large-latest", messages=messages)
-        return response.choices[0].message.content
-    except Exception as e:
-        print(f"Error generating answer: {str(e)}")
-        return "An error occurred while generating the answer."
-
-# Streamlit UI
-def streamlit_app():
-    st.title('UDST Policy Chatbot')
+    # Encode the inputs for Mistral
+    inputs = tokenizer(query, return_tensors="pt", truncation=True, padding="max_length", max_length=512)
+    context_inputs = tokenizer(context, return_tensors="pt", truncation=True, padding="max_length", max_length=512)
     
-    # User input query
-    query = st.text_input("Enter your query:")
+    # Generate the answer using Mistral
+    outputs = model.generate(input_ids=inputs['input_ids'], context_input_ids=context_inputs['input_ids'])
     
+    # Decode the generated output
+    answer = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return answer
+
+# Streamlit app interface
+def app():
+    st.title("UDST Policy Chatbot")
+    st.write("Ask me any questions about UDST policies!")
+
+    # User query input
+    query = st.text_input("Enter your question:")
+
+    answer = ""
     if query:
-        # Intent classification
-        labels = list(policies.keys())
-        classification = classifier(query, labels)
-        predicted_policy = classification['labels'][0]
-        st.write(f"Predicted Policy: {predicted_policy}")
-        
-        # Fetch and process policy data
-        policy_text = fetch_policy_data(policies[predicted_policy])
-        chunks = chunk_text(policy_text)
-        embeddings = get_text_embedding(chunks)
-        
-        # Debugging: Print embeddings to check if they are empty or malformed
-        print(f"Embeddings: {embeddings}")  # Debugging line
-        
-        if not embeddings:
-            st.write("Error: No embeddings generated. Please check the embedding generation process.")
-            return
-        
-        faiss_index = create_faiss_index(embeddings)
-        
-        # Retrieve most relevant chunks
-        query_embedding = get_text_embedding([query])[0]
-        retrieved_chunks = [chunks[i] for i in search_relevant_chunks(faiss_index, query_embedding)]
-        context = " ".join(retrieved_chunks)
-        
-        # Generate answer
-        answer = mistral_answer(query, context)
+        # Classify the intent (which policy the query relates to)
+        policy_name = classify_intent(query)
+
+        # Get the answer using Mistral-based QA pipeline
+        answer = get_policy_answer(query, policy_name)
+
+        # Display the answer in the text area
         st.text_area("Answer:", answer, height=200)
 
+# Run the app
 if __name__ == "__main__":
-    streamlit_app()
+    app()
+

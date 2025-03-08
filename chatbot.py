@@ -75,6 +75,10 @@ def get_text_embedding(text_chunks):
     #index.add(embedding_vectors)
     #return index
 def create_faiss_index(embeddings):
+    # Check if embeddings are empty
+    if not embeddings:
+        raise ValueError("Embeddings are empty! Please check the embedding generation process.")
+    
     # Convert embeddings to a NumPy array
     embedding_vectors = np.array(embeddings, dtype=np.float32)
     
@@ -85,14 +89,23 @@ def create_faiss_index(embeddings):
     if embedding_vectors.ndim == 1:
         embedding_vectors = embedding_vectors.reshape(1, -1)  # Reshape to 2D if needed
     
+    # Check again if the reshaped array is 2D
+    if embedding_vectors.ndim != 2:
+        raise ValueError(f"Expected 2D array for embeddings, but got {embedding_vectors.ndim}D array.")
+    
     # Normalize the vectors (required for better retrieval in FAISS)
-    embedding_vectors = normalize(embedding_vectors, axis=1)
+    try:
+        embedding_vectors = normalize(embedding_vectors, axis=1)
+    except ValueError as e:
+        print(f"Error during normalization: {str(e)}")
+        raise
     
     # Create a FAISS index
     d = embedding_vectors.shape[1]  # Number of dimensions
     index = faiss.IndexHNSWFlat(d, 32)  # HNSW for efficient search
     index.add(embedding_vectors)
     return index
+
 
 
 # search FAISS index

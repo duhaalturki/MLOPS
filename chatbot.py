@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 from urllib.parse import urlparse
-from mistralai import Client
+from mistralai import Mistral
 
 # Mistral Client setup
 client = Client(api_key="NXyKdE5JFehmTjXn1RtYyVBOlMzPLGyB")

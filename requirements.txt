@@ -1,8 +1,10 @@
+
 streamlit
+requests
+beautifulsoup4
+numpy
 faiss-cpu
 mistralai
-beautifulsoup4
-requests
-sentence-transformers
-torch
 transformers
+scikit-learn
+torch

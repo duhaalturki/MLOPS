@@ -17,7 +17,7 @@ client = Mistral(api_key=api_key)
 # Intent classification model (Zero-shot using Hugging Face)
 classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
 
-# Policies
+# Full list of policies
 policies = {
     "Academic Annual Leave": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/academic-annual-leave-policy",
     "Academic Appraisal": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/academic-appraisal-policy",
@@ -97,8 +97,12 @@ def mistral_answer(query, context):
     Answer:
     """
     messages = [{"role": "user", "content": prompt}]
-    response = client.chat.complete(model="mistral-large-latest", messages=messages)
-    return response.choices[0].message.content
+    try:
+        response = client.chat.complete(model="mistral-large-latest", messages=messages)
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"Error generating answer: {str(e)}")
+        return "An error occurred while generating the answer."
 
 # Streamlit UI
 def streamlit_app():

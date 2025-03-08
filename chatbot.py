@@ -67,13 +67,33 @@ def get_text_embedding(text_chunks):
 
 
 # create FAISS index
+#def create_faiss_index(embeddings):
+    #embedding_vectors = np.array(embeddings, dtype=np.float32)
+    #embedding_vectors = normalize(embedding_vectors, axis=1)  # Normalize for better retrieval
+    #d = embedding_vectors.shape[1]
+    #index = faiss.IndexHNSWFlat(d, 32)  # HNSW for efficient search
+    #index.add(embedding_vectors)
+    #return index
 def create_faiss_index(embeddings):
+    # Convert embeddings to a NumPy array
     embedding_vectors = np.array(embeddings, dtype=np.float32)
-    embedding_vectors = normalize(embedding_vectors, axis=1)  # Normalize for better retrieval
-    d = embedding_vectors.shape[1]
+    
+    # Check the shape of embedding_vectors
+    print(f"Shape of embedding_vectors: {embedding_vectors.shape}")  # Debugging line
+    
+    # Ensure the embeddings are 2D (each row is a vector)
+    if embedding_vectors.ndim == 1:
+        embedding_vectors = embedding_vectors.reshape(1, -1)  # Reshape to 2D if needed
+    
+    # Normalize the vectors (required for better retrieval in FAISS)
+    embedding_vectors = normalize(embedding_vectors, axis=1)
+    
+    # Create a FAISS index
+    d = embedding_vectors.shape[1]  # Number of dimensions
     index = faiss.IndexHNSWFlat(d, 32)  # HNSW for efficient search
     index.add(embedding_vectors)
     return index
+
 
 # search FAISS index
 def search_relevant_chunks(index, query_embedding, k=3):

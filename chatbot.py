@@ -1,12 +1,78 @@
 import streamlit as st
-import mistralai
-from mistralai import Client
+import os
+import requests
+from bs4 import BeautifulSoup
+import numpy as np
+from mistralai import Mistral
+import faiss
 
-# Initialize Mistral client with your API key
-client = Client(api_key="NXyKdE5JFehmTjXn1RtYyVBOlMzPLGyB")  # Replace with your actual Mistral API key
+# Set up your Mistral API key
+api_key = "NXyKdE5JFehmTjXn1RtYyVBOlMzPLGyB"
+os.environ["MISTRAL_API_KEY"] = api_key
 
-# Define the policy dictionary
-policies = {
+# Fetching and parsing policy data
+def fetch_policy_data(url):
+    response = requests.get(url)
+    html_doc = response.text
+    soup = BeautifulSoup(html_doc, "html.parser")
+    tag = soup.find("div")
+    text = tag.text.strip()
+    return text
+
+# Chunking function to break text into smaller parts
+def chunk_text(text, chunk_size=512):
+    return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+
+# Get embeddings for text chunks
+def get_text_embedding(list_txt_chunks):
+    client = Mistral(api_key=api_key)
+    embeddings_batch_response = client.embeddings.create(model="mistral-embed", inputs=list_txt_chunks)
+    return embeddings_batch_response.data
+
+# Initialize FAISS index
+def create_faiss_index(embeddings):
+    # Convert the embeddings to a 2D NumPy array
+    embedding_vectors = np.array([embedding.embedding for embedding in embeddings])
+    
+    # Ensure the shape is (num_embeddings, embedding_size)
+    d = embedding_vectors.shape[1]  # embedding size (dimensionality)
+    
+    # Create the FAISS index and add the embeddings
+    index = faiss.IndexFlatL2(d)
+    faiss_index = faiss.IndexIDMap(index)
+    
+    # Add the embeddings with an id for each (FAISS requires ids)
+    faiss_index.add_with_ids(embedding_vectors, np.array(range(len(embedding_vectors))))
+    
+    return faiss_index
+
+
+# Search for the most relevant chunks based on query embedding
+def search_relevant_chunks(faiss_index, query_embedding, k=2):
+    D, I = faiss_index.search(query_embedding, k)
+    return I
+
+# Mistral model to generate answers based on context
+def mistral_answer(query, context):
+    prompt = f"""
+    Context information is below.
+    ---------------------
+    {context}
+    ---------------------
+    Given the context information and not prior knowledge, answer the query.
+    Query: {query}
+    Answer:
+    """
+    client = Mistral(api_key=api_key)
+    messages = [{"role": "user", "content": prompt}]
+    chat_response = client.chat.complete(model="mistral-large-latest", messages=messages)
+    return chat_response.choices[0].message.content
+
+# Streamlit Interface
+def streamlit_app():
+    st.title('UDST Policies Q&A')
+
+policies = ]
     "Academic Annual Leave": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/academic-annual-leave-policy",
     "Academic Appraisal": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/academic-appraisal-policy",
     "Intellectual Property": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/intellectual-property-policy",
@@ -27,59 +93,34 @@ policies = {
     "Library Study Room Booking": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/library-study-room-booking-procedure",
     "Digital Media Centre Booking": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/digital-media-centre-booking",
     "Use of Library Space": "https://www.udst.edu.qa/about-udst/institutional-excellence-ie/policies-and-procedures/use-library-space-policy"
-}
+    ]
 
-# Function to classify the intent of the user's query and match it to a policy
-def classify_intent(query):
-    # Use Mistral to classify the intent
-    response = client.chat.complete(
-        model="mistral-large-latest",  # Use Mistral large model for intent classification
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant that classifies queries related to policies."},
-            {"role": "user", "content": f"Classify the policy related to the query: '{query}'"}
-        ]
-    )
-    intent = response['choices'][0]['message']['content'].strip()
+    selected_policy_url = st.selectbox('Select a Policy', policies)
     
-    # Check which policy matches the intent
-    for policy_name in policies.keys():
-        if policy_name.lower() in intent.lower():
-            return policy_name, policies[policy_name]
+    # Fetch policy data and chunk it
+    policy_text = fetch_policy_data(selected_policy_url)
+    chunks = chunk_text(policy_text)
     
-    return None, None  # If no policy is found
+    # Generate embeddings for the chunks and create a FAISS index
+    embeddings = get_text_embedding(chunks)
+    faiss_index = create_faiss_index(embeddings)
+    
+    # Input box for query
+    query = st.text_input("Enter your Query:")
+    
+    if query:
+        # Embed the user query and search for relevant chunks
+        query_embedding = np.array([get_text_embedding([query])[0].embedding])
+        I = search_relevant_chunks(faiss_index, query_embedding, k=2)
+        retrieved_chunks = [chunks[i] for i in I.tolist()[0]]
+        context = " ".join(retrieved_chunks)
+        
+        # Generate answer from the model
+        answer = mistral_answer(query, context)
+        
+        # Display the answer
+        st.text_area("Answer:", answer, height=200)
 
-# Function to generate an answer using Mistral's QA pipeline
-def generate_answer(query, policy_url):
-    context = f"Here is the link to the policy: {policy_url}. Now, answer the following question: {query}"
-    response = client.chat.complete(
-        model="mistral-large-latest",  # Use Mistral large model for QA
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant that answers questions based on the policies."},
-            {"role": "user", "content": f"Answer the question: '{query}' using the following context: {context}"}
-        ]
-    )
-    return response['choices'][0]['message']['content'].strip()
 
-# Streamlit interface
-def streamlit_app():
-    st.title("UDST Policy Chatbot")
-
-    # Input field for user query
-    query = st.text_input("Enter your query:")
-
-    if st.button("Submit"):
-        if query:
-            # Classify intent and match it to the policy
-            policy_name, policy_url = classify_intent(query)
-            if policy_name:
-                # Generate an answer using Mistral
-                answer = generate_answer(query, policy_url)
-                st.text_area("Answer", answer, height=200)
-            else:
-                st.warning("Sorry, no related policy found for your query.")
-        else:
-            st.warning("Please enter a query.")
-
-# Run the Streamlit app
 if __name__ == "__main__":
     streamlit_app()
